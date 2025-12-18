@@ -1,40 +1,54 @@
-name: Make My APK
+name: Final Fix Build APK
 
 on:
-  workflow_dispatch: # 允许手动点击按钮运行
+  workflow_dispatch: # 手动触发
 
 jobs:
-  build-me-an-apk:
+  build-final:
     runs-on: ubuntu-latest
     steps:
-      # 1. 下载代码
+      # 1. 下载完整代码（包含子模块）
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          submodules: recursive  # 关键：确保下载 core 核心库
 
-      # 2. 安装 Java 环境
+      # 2. 配置 Java 环境
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
 
-      # 3. 安装 Flutter 环境
+      # 3. 配置 Flutter 环境
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
 
-      # 4. 下载依赖包
+      # 4. 创建虚假签名文件 (防止 gradle 报错)
+      # 即使是 Debug 模式，有些项目也会在配置阶段检查这个文件是否存在
+      - name: Create Dummy Key Properties
+        run: |
+          cd simple_live_app/android
+          echo "storePassword=123456" > key.properties
+          echo "keyPassword=123456" >> key.properties
+          echo "keyAlias=key" >> key.properties
+          echo "storeFile=key.jks" >> key.properties
+
+      # 5. 下载依赖 (指定在 simple_live_app 目录下运行)
       - name: Get Packages
+        working-directory: ./simple_live_app
         run: flutter pub get
 
-      # 5. 开始编译 (使用Debug模式，跳过签名验证)
+      # 6. 开始编译 (指定在 simple_live_app 目录下运行)
       - name: Build Debug APK
+        working-directory: ./simple_live_app
         run: flutter build apk --debug
 
-      # 6. 上传编译好的文件
+      # 7. 上传编译好的文件
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: simple-live-app
-          path: build/app/outputs/flutter-apk/app-debug.apk
+          name: simple-live-final
+          path: simple_live_app/build/app/outputs/flutter-apk/app-debug.apk
